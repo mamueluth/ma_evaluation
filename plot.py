@@ -27,9 +27,11 @@ def calculate_samples_per_second(df):
     return samples_per_second
 
 def shift_to_zero(df):
-    start = df['Time'].head(1).values[0]
+    start_time = df['Time'].head(1).values[0]
     # shift start everything relative to start:
-    return df['Time'] - start
+    shifted_df = df.copy()
+    shifted_df['Time'] = shifted_df['Time'] - start_time
+    return shifted_df
 
 def filter_values_out_of_range(values):
     #replace to near or to far with nan
@@ -119,23 +121,24 @@ if __name__=="__main__":
     plot_type = args.plot_type
 
     df = read_values(file_name)
-    samples_per_second = calculate_samples_per_second(df)
+    df_shifted = shift_to_zero(df)
+    samples_per_second = calculate_samples_per_second(df_shifted)
     if plot_type == "asc_desc":
-        ascending_frames, descending_frames = get_asc_desc_frames(df)
+        ascending_frames, descending_frames = get_asc_desc_frames(df_shifted)
         plot_asc_desc(ascending_frames, descending_frames, 'green', 'red')
     elif plot_type == "asc_desc_base":
-        plot_base(df['Time'], df['Value'], 'blue')
-        ascending_frames, descending_frames = get_asc_desc_frames(df)
+        plot_base(df_shifted['Time'], df_shifted['Value'], 'blue')
+        ascending_frames, descending_frames = get_asc_desc_frames(df_shifted)
         plot_asc_desc(ascending_frames, descending_frames, 'green', 'red')
     elif plot_type == "base":
-        plot_base(df['Time'], df['Value'], 'blue')
+        plot_base(df_shifted['Time'], df_shifted['Value'], 'blue')
     elif plot_type == "cut":
-        plot_cut(df['Time'], df['Value'], 'blue')
+        plot_cut(df_shifted['Time'], df_shifted['Value'], 'blue')
     elif plot_type == "cut_base":
-        plot_base(df['Time'], df['Value'], 'blue')
-        plot_cut(df['Time'], df['Value'], 'red')
+        plot_base(df_shifted['Time'], df_shifted['Value'], 'blue')
+        plot_cut(df_shifted['Time'], df_shifted['Value'], 'red')
     elif plot_type == 'raw_shifted' :
-        plot_raw_shifted(df['Time'], df['Value'], 'blue')
+        plot_raw_shifted(df_shifted['Time'], df_shifted['Value'], 'blue')
     else:
         print("Plotting raw data")
         plot_raw_shifted(df['Time'], df['Value'], 'blue')

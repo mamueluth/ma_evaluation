@@ -28,9 +28,11 @@ def calculate_samples_per_second(df):
     return samples_per_second
 
 def shift_to_zero(df):
-    start = df['Time'].head(1).values[0]
+    start_time = df['Time'].head(1).values[0]
     # shift start everything relative to start:
-    return df['Time'] - start
+    shifted_df = df.copy()
+    shifted_df['Time'] = shifted_df['Time'] - start_time
+    return shifted_df
 
 def filter_values_out_of_range(df):
     #replace to near or to far with nan
@@ -109,7 +111,7 @@ if __name__=="__main__":
     df = read_values(file_name)
     samples_per_second = calculate_samples_per_second(df)
     df_shifted = shift_to_zero(df)
-    df_shifted_filterd = filter_values_out_of_range(df)
+    df_shifted_filterd = filter_values_out_of_range(df_shifted)
     plot_base(df_shifted_filterd['Time'], df_shifted_filterd['Value'] , 'blue')
     ascending_frames, descending_frames = get_asc_desc_frames(df_shifted_filterd)
     if model == "linear":
