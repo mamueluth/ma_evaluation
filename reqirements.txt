@@ -1,4 +1,4 @@
 matplotlib
 pandas
-sklearn
+scikit-learn
 wheel
