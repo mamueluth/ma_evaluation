@@ -1,3 +1,4 @@
-pandas
-pyserial
 matplotlib
+pandas
+sklearn
+wheel
