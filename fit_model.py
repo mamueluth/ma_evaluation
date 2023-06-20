@@ -6,13 +6,14 @@ import sklearn.linear_model as lm
 import sys
 
 out_of_range = 300
-max_threshold = 8.88
+max_threshold = 8.85
 min_threshold = 6.375
 
 def parse_cli_args():
     parser = argparse.ArgumentParser(description='plot collected data')
     parser.add_argument('file', type=str, help='Serial port which is opened.')
     parser.add_argument('--model', '-m', type=str, choices=['linear', 'ransac', 'linear_ransac'], default='', help='Wich model is fit to the data.')
+    parser.add_argument('--debug', '-d', action='store_true', help='If debug is set the ascending and descending data frames are shown.')
 
 
     return parser.parse_args(args=None if sys.argv[1:] else ["--help"])
@@ -85,28 +86,66 @@ def plot_linear_reg(ascending_frames, descending_frames, color):
         values_asc = asc_df[['Value']]
         time_ms_asc = convert_to_ms(time_ns_asc)
         # plt.scatter(time_ms_asc, values_asc, color='green', label='ascending values')
-        reg = lm.LinearRegression()
-        reg.fit(time_ms_asc, values_asc)
-        plt.plot(time_ms_asc, reg.predict(time_ms_asc), color=color, linewidth=1)
-        print(f"Asc Score: {reg.score(time_ms_asc, values_asc)}")
-        print(f"Asc coef: {reg.coef_}")
+        lin_reg = lm.LinearRegression()
+        lin_reg.fit(time_ms_asc, values_asc)
+        plt.plot(time_ms_asc, lin_reg.predict(time_ms_asc), color=color, linewidth=1)
+        print(f"Asc Score: {lin_reg.score(time_ms_asc, values_asc)}")
+        print(f"Asc coef: {lin_reg.coef_}")
     # descending values and time
     for desc_df in descending_frames:
         time_ns_desc = desc_df[['Time']]
         values_desc = desc_df[['Value']]
         time_ms_desc = convert_to_ms(time_ns_desc)
         # plt.scatter(time_ms_desc, values_desc, color='red', label='descending values')
-        reg = lm.LinearRegression()
-        reg.fit(time_ms_desc, values_desc)
-        plt.plot(time_ms_desc, reg.predict(time_ms_desc), color=color, linewidth=1)
-        print(f"Des Params: {reg.score(time_ms_desc, values_desc)}")
-        print(f"Des coef: {reg.coef_}")
+        lin_reg = lm.LinearRegression()
+        lin_reg.fit(time_ms_desc, values_desc)
+        plt.plot(time_ms_desc, lin_reg.predict(time_ms_desc), color=color, linewidth=1)
+        print(f"Des Params: {lin_reg.score(time_ms_desc, values_desc)}")
+        print(f"Des coef: {lin_reg.coef_}")
 
+def plot_ransac(ascending_frames, descending_frames, color):
+    # ascending values and time
+    for asc_df in ascending_frames:
+        time_ns_asc = asc_df[['Time']]
+        values_asc = asc_df[['Value']]
+        time_ms_asc = convert_to_ms(time_ns_asc)
+        # plt.scatter(time_ms_asc, values_asc, color='green', label='ascending values')
+        ransac = lm.RANSACRegressor()
+        ransac.fit(time_ms_asc, values_asc)
+        plt.plot(time_ms_asc, ransac.predict(time_ms_asc), color=color, linewidth=1)
+        print(f"Asc Score: {ransac.score(time_ms_asc, values_asc)}")
+        print(f"Asc coef: {ransac.estimator_.coef_}")
+    # descending values and time
+    for desc_df in descending_frames:
+        time_ns_desc = desc_df[['Time']]
+        values_desc = desc_df[['Value']]
+        time_ms_desc = convert_to_ms(time_ns_desc)
+        # plt.scatter(time_ms_desc, values_desc, color='red', label='descending values')
+        ransac = lm.RANSACRegressor()
+        ransac.fit(time_ms_desc, values_desc)
+        plt.plot(time_ms_desc, ransac.predict(time_ms_desc), color=color, linewidth=1)
+        print(f"Des Params: {ransac.score(time_ms_desc, values_desc)}")
+        print(f"Des coef: {ransac.estimator_.coef_}")
+
+def plot_asc_desc(ascending_frames, descending_frames, asc_color, desc_color):
+    # ascending values and time
+    for asc_df in ascending_frames:
+        time_ns_asc = asc_df[['Time']]
+        values_asc = asc_df[['Value']]
+        time_ms_asc = convert_to_ms(time_ns_asc)
+        plt.scatter(time_ms_asc, values_asc, color=asc_color, label='ascending values')
+    # descending values and time
+    for desc_df in descending_frames:
+        time_ns_desc = desc_df[['Time']]
+        values_desc = desc_df[['Value']]
+        time_ms_desc = convert_to_ms(time_ns_desc)
+        plt.scatter(time_ms_desc, values_desc, color=desc_color, label='descending values')
 
 if __name__=="__main__":
     args = parse_cli_args()
     file_name = args.file
     model = args.model
+    debug = args.debug
 
     df = read_values(file_name)
     samples_per_second = calculate_samples_per_second(df)
@@ -115,12 +154,15 @@ if __name__=="__main__":
     plot_base(df_shifted_filterd['Time'], df_shifted_filterd['Value'] , 'blue')
     ascending_frames, descending_frames = get_asc_desc_frames(df_shifted_filterd)
     if model == "linear":
-        plot_linear_reg(ascending_frames, descending_frames, 'pink')
+        plot_linear_reg(ascending_frames, descending_frames, 'red')
     elif model == "linear_ransac":
-        print("Plotting linear and ransac estimation")
+        plot_linear_reg(ascending_frames, descending_frames, 'orange')
+        plot_ransac(ascending_frames, descending_frames, 'red')
     else :
-        print("Plotting linear estimation data")
+        plot_ransac(ascending_frames, descending_frames, 'red')
 
+    if(debug):
+        plot_asc_desc(ascending_frames, descending_frames, 'green', 'yellow')
 
     plt.xlabel('Time (ms)')
     plt.ylabel('Value')

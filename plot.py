@@ -5,7 +5,7 @@ import pandas as pd
 import sys
 
 out_of_range = 300
-max_threshold = 8.88
+max_threshold = 8.85
 min_threshold = 6.375
 
 def parse_cli_args():
