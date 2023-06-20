@@ -12,8 +12,7 @@ min_threshold = 6.375
 def parse_cli_args():
     parser = argparse.ArgumentParser(description='plot collected data')
     parser.add_argument('file', type=str, help='Serial port which is opened.')
-    parser.add_argument('--model', '-m', type=str, choices=['linear', 'ransac', 'base', 'cut', 'cut_base'], default='', help='Wich model is fit to the data.')
-    parser.add_argument('--plot_type', '-t', type=str, choices=['asc_desc', 'asc_desc_base', 'base', 'cut', 'cut_base'], default='', help='How data is plotted.')
+    parser.add_argument('--model', '-m', type=str, choices=['linear', 'ransac', 'linear_ransac'], default='', help='Wich model is fit to the data.')
 
 
     return parser.parse_args(args=None if sys.argv[1:] else ["--help"])
@@ -40,7 +39,7 @@ def plot_base(file_name, color):
 
     return samples_per_second
 
-def plot_asc_desc(file_name, asc_color, desc_color):
+def plot_linear_reg(file_name, color):
         # Read the CSV file into a pandas DataFrame
     df = pd.read_csv(file_name)
 
@@ -79,43 +78,46 @@ def plot_asc_desc(file_name, asc_color, desc_color):
         elif min_threshold <= value <= max_threshold:
             descending_df = pd.concat([descending_df, row.to_frame().T])
 
-    print(len(ascending_frames))
-    print(len(descending_frames))
-    return 0
     # ascending values and time
-    time_ns_asc = ascending_frames[0]['Time']
-    values_asc = ascending_frames[0]['Value']
-    time_ms_asc = time_ns_asc / 1e6
-    plt.scatter(time_ms_asc, values_asc, color=asc_color, label='ascending values')
+    for asc_df in ascending_frames:
+        time_ns_asc = asc_df[['Time']]
+        values_asc = asc_df[['Value']]
+        time_ms_asc = time_ns_asc / 1e6
+        # plt.scatter(time_ms_asc, values_asc, color='green', label='ascending values')
+        reg = lm.LinearRegression()
+        reg.fit(time_ms_asc, values_asc)
+        plt.plot(time_ms_asc, reg.predict(time_ms_asc), color=color, linewidth=1)
+        print(f"Asc Score: {reg.score(time_ms_asc, values_asc)}")
+        print(f"Asc coef: {reg.coef_}")
     # descending values and time
-    time_ns_desc = descending_frames[0]['Time']
-    values_desc = descending_frames[0]['Value']
-    time_ms_desc = time_ns_desc / 1e6
-    plt.scatter(time_ms_desc, values_desc, color=desc_color, label='descending values')
+    for desc_df in descending_frames:
+        time_ns_desc = desc_df[['Time']]
+        values_desc = desc_df[['Value']]
+        time_ms_desc = time_ns_desc / 1e6
+        # plt.scatter(time_ms_desc, values_desc, color='red', label='descending values')
+        reg = lm.LinearRegression()
+        reg.fit(time_ms_desc, values_desc)
+        plt.plot(time_ms_desc, reg.predict(time_ms_desc), color=color, linewidth=1)
+        print(f"Des Params: {reg.score(time_ms_desc, values_desc)}")
+        print(f"Des coef: {reg.coef_}")
 
     return samples_per_second
 
 if __name__=="__main__":
     args = parse_cli_args()
     file_name = args.file
-    plot_type = args.plot_type
+    model = args.model
 
     samples_per_second = 0.0
-    if plot_type == "asc_desc":
-        samples_per_second = plot_asc_desc(file_name, 'green', 'red')
-    elif plot_type == "asc_desc_base":
+    if model == "linear":
         samples_per_second = plot_base(file_name, 'blue')
-        plot_asc_desc(file_name, 'green', 'red')
-    elif plot_type == "base":
+        plot_linear_reg(file_name, 'pink')
+    elif model == "linear_ransac":
         samples_per_second = plot_base(file_name, 'blue')
-    elif plot_type == "cut":
-        samples_per_second = plot_cut(file_name, 'blue')
-    elif plot_type == "cut_base":
-        samples_per_second = plot_base(file_name, 'blue')
-        plot_cut(file_name, 'red')
     else :
+        samples_per_second = plot_base(file_name, 'blue')
         print("Plotting raw data")
-        samples_per_second = plot_raw(file_name, 'blue')
+
 
     plt.xlabel('Time (ms)')
     plt.ylabel('Value')
