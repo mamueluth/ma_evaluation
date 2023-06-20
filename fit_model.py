@@ -17,38 +17,30 @@ def parse_cli_args():
 
     return parser.parse_args(args=None if sys.argv[1:] else ["--help"])
 
-def plot_base(file_name, color):
+def read_values(file_name):
     # Read the CSV file into a pandas DataFrame
-    df = pd.read_csv(file_name)
+    return pd.read_csv(file_name)
 
-    # Extract the time and value columns from the DataFrame
-    time_ns = df['Time']
-    values = df['Value']
-    #replace to near or to far with nan
-    values[values > out_of_range] = float('NaN')
-    # calculate samples per second
-    start = time_ns.head(1).values[0]
-    stop = time_ns.tail(1).values[0]
-    samples_per_second = len(values)/((stop - start) / 1e9)
-    # shift start everything relative to start:
-    time_ns = time_ns - start
-    # Convert time to milliseconds for better visualization
-    time_ms = time_ns / 1e6
-
-    plt.plot(time_ms, values, color=color, label='base')
-
-    return samples_per_second
-
-def plot_linear_reg(file_name, color):
-        # Read the CSV file into a pandas DataFrame
-    df = pd.read_csv(file_name)
-
+def calculate_samples_per_second(df):
     start = df['Time'].head(1).values[0]
     stop = df['Time'].tail(1).values[0]
     samples_per_second = len(df['Value'])/((stop - start) / 1e9)
-    # shift start everything relative to start:
-    df['Time'] = df['Time'] - start
+    return samples_per_second
 
+def shift_to_zero(df):
+    start = df['Time'].head(1).values[0]
+    # shift start everything relative to start:
+    return df['Time'] - start
+
+def filter_values_out_of_range(df):
+    #replace to near or to far with nan
+    df['Value'][df['Value'] > out_of_range] = float('NaN')
+    return df
+
+def convert_to_ms(time):
+    return time / 1e6
+
+def get_asc_desc_frames(df):
     # Initialize empty DataFrames for A and B
     ascending_df = pd.DataFrame(columns=['Time', 'Value'])
     ascending_frames = []
@@ -78,11 +70,18 @@ def plot_linear_reg(file_name, color):
         elif min_threshold <= value <= max_threshold:
             descending_df = pd.concat([descending_df, row.to_frame().T])
 
+    return ascending_frames, descending_frames
+
+def plot_base(time, values, color):
+    time_ms = convert_to_ms(time)
+    plt.plot(time_ms, values, color=color, label='base')
+
+def plot_linear_reg(ascending_frames, descending_frames, color):
     # ascending values and time
     for asc_df in ascending_frames:
         time_ns_asc = asc_df[['Time']]
         values_asc = asc_df[['Value']]
-        time_ms_asc = time_ns_asc / 1e6
+        time_ms_asc = convert_to_ms(time_ns_asc)
         # plt.scatter(time_ms_asc, values_asc, color='green', label='ascending values')
         reg = lm.LinearRegression()
         reg.fit(time_ms_asc, values_asc)
@@ -93,7 +92,7 @@ def plot_linear_reg(file_name, color):
     for desc_df in descending_frames:
         time_ns_desc = desc_df[['Time']]
         values_desc = desc_df[['Value']]
-        time_ms_desc = time_ns_desc / 1e6
+        time_ms_desc = convert_to_ms(time_ns_desc)
         # plt.scatter(time_ms_desc, values_desc, color='red', label='descending values')
         reg = lm.LinearRegression()
         reg.fit(time_ms_desc, values_desc)
@@ -101,22 +100,24 @@ def plot_linear_reg(file_name, color):
         print(f"Des Params: {reg.score(time_ms_desc, values_desc)}")
         print(f"Des coef: {reg.coef_}")
 
-    return samples_per_second
 
 if __name__=="__main__":
     args = parse_cli_args()
     file_name = args.file
     model = args.model
 
-    samples_per_second = 0.0
+    df = read_values(file_name)
+    samples_per_second = calculate_samples_per_second(df)
+    df_shifted = shift_to_zero(df)
+    df_shifted_filterd = filter_values_out_of_range(df)
+    plot_base(df_shifted_filterd['Time'], df_shifted_filterd['Value'] , 'blue')
+    ascending_frames, descending_frames = get_asc_desc_frames(df_shifted_filterd)
     if model == "linear":
-        samples_per_second = plot_base(file_name, 'blue')
-        plot_linear_reg(file_name, 'pink')
+        plot_linear_reg(ascending_frames, descending_frames, 'pink')
     elif model == "linear_ransac":
-        samples_per_second = plot_base(file_name, 'blue')
+        print("Plotting linear and ransac estimation")
     else :
-        samples_per_second = plot_base(file_name, 'blue')
-        print("Plotting raw data")
+        print("Plotting linear estimation data")
 
 
     plt.xlabel('Time (ms)')
