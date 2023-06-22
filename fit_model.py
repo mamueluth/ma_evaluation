@@ -15,7 +15,7 @@ def parse_cli_args():
     parser = argparse.ArgumentParser(description='plot collected data')
     parser.add_argument('file', type=str, help='Serial port which is opened.')
     parser.add_argument('--model', '-m', type=str, choices=['linear', 'ransac', 'linear_ransac'], default='',
-                        help='Wich model is fit to the data.')
+                        help='Which model is fit to the data.')
     parser.add_argument('--debug', '-d', action='store_true',
                         help='If debug is set the ascending and descending data frames are shown.')
     parser.add_argument('--asc_desc', '-ad', action='store_true',
@@ -115,6 +115,26 @@ def plot_linear_reg(ascending_frames, descending_frames, color):
         plt.plot(time_ms_desc, lin_reg.predict(time_ms_desc), color=color, linewidth=1)
         print(f"Linear Regression des Params: {lin_reg.score(time_ms_desc, values_desc)}")
         print(f"Linear Regression des coef: {lin_reg.coef_}")
+
+
+def plot_ransac_raw(df, color, debug):
+    df = df.dropna(subset=['Value'])
+    time = df[['Time']]
+    values = df[['Value']]
+    time_ms = convert_to_ms(time)
+    ransac = lm.RANSACRegressor()
+    ransac.fit(time, values)
+    plt.plot(time_ms, ransac.predict(time_ms), color=color, linewidth=1)
+    print(f"Ransac asc Score: {ransac.score(time_ms, values)}")
+    print(f"Ransac asc coef: {ransac.estimator_.coef_}")
+    if (debug):
+        # plt.scatter(time_ms_asc, values_asc, color='green', label='ascending values')
+        inlier_mask = ransac.inlier_mask_
+        outlier_mask = np.logical_not(inlier_mask)
+        plt.scatter(time_ms[inlier_mask], values[inlier_mask], c='steelblue', edgecolor='white', marker='o',
+                    label='Inliers')
+        plt.scatter(time_ms[outlier_mask], values[outlier_mask], c='limegreen', edgecolor='white',
+                    marker='s', label='Outliers')
 
 
 def plot_ransac(ascending_frames, descending_frames, color, debug):

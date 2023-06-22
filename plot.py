@@ -2,18 +2,19 @@ import argparse
 import matplotlib.pyplot as plt
 import os
 import pandas as pd
+from sklearn.cluster import DBSCAN
 import sys
 
 out_of_range = 300
-max_threshold = 8.85
-min_threshold = 6.375
+max_threshold = 8.9
+min_threshold = 6.36
 
 
 def parse_cli_args():
     parser = argparse.ArgumentParser(description='plot collected data')
     parser.add_argument('file', type=str, help='Serial port which is opened.')
     parser.add_argument('--plot_type', '-t', type=str,
-                        choices=['asc_desc', 'asc_desc_base', 'base', 'cut', 'cut_base', 'raw', 'raw_shifted'],
+                        choices=['asc_desc', 'asc_desc_base', 'base', 'cut', 'cut_base', 'dbscan', 'raw', 'raw_shifted'],
                         default='', help='How data is plotted.')
 
     return parser.parse_args(args=None if sys.argv[1:] else ["--help"])
@@ -81,6 +82,35 @@ def get_asc_desc_frames(df):
 
     return ascending_frames, descending_frames
 
+def plot_dbscan(df):
+    df = df.dropna(subset=['Value'])
+    df_filtered = df[(df['Value'] >= min_threshold) & (df['Value'] <= max_threshold)]
+    time = df_filtered['Time']
+    time_ms = convert_to_ms(time)
+    values = df_filtered['Value']
+    plt.scatter(time_ms, values, color='blue', label='base')
+
+    df_features = pd.concat([time_ms, df_filtered['Value']], axis=1)
+
+    # Perform DBSCAN clustering
+    dbscan = DBSCAN(eps=1000, min_samples=100)  # Adjust the parameters as per your requirements
+    cluster_labels = dbscan.fit_predict(df_features)
+
+    # Add the cluster labels as a new column in the DataFrame
+    df_filtered['Cluster'] = cluster_labels
+
+    # Plot the clusters
+    plt.scatter(time_ms, df_filtered['Value'], c=df_filtered['Cluster'], cmap='viridis')
+    plt.colorbar(label='Cluster')
+
+    labels = dbscan.labels_
+
+    # Number of clusters in labels, ignoring noise if present.
+    n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+    n_noise_ = list(labels).count(-1)
+
+    print("Estimated number of clusters: %d" % n_clusters_)
+    print("Estimated number of noise points: %d" % n_noise_)
 
 def plot_raw(time, values, color):
     plt.plot(time, values, color=color, label='base')
@@ -148,6 +178,9 @@ if __name__ == "__main__":
     elif plot_type == "cut_base":
         plot_base(df_shifted['Time'], df_shifted['Value'], 'blue')
         plot_cut(df_shifted['Time'], df_shifted['Value'], 'red')
+    elif plot_type == "dbscan":
+        plot_base(df_shifted['Time'], df_shifted['Value'], 'blue')
+        plot_dbscan(df_shifted)
     elif plot_type == 'raw_shifted':
         plot_raw_shifted(df_shifted['Time'], df_shifted['Value'], 'blue')
     else:
