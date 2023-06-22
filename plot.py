@@ -8,23 +8,28 @@ out_of_range = 300
 max_threshold = 8.85
 min_threshold = 6.375
 
+
 def parse_cli_args():
     parser = argparse.ArgumentParser(description='plot collected data')
     parser.add_argument('file', type=str, help='Serial port which is opened.')
-    parser.add_argument('--plot_type', '-t', type=str, choices=['asc_desc', 'asc_desc_base', 'base', 'cut', 'cut_base', 'raw', 'raw_shifted'], default='', help='How data is plotted.')
-
+    parser.add_argument('--plot_type', '-t', type=str,
+                        choices=['asc_desc', 'asc_desc_base', 'base', 'cut', 'cut_base', 'raw', 'raw_shifted'],
+                        default='', help='How data is plotted.')
 
     return parser.parse_args(args=None if sys.argv[1:] else ["--help"])
+
 
 def read_values(file_name):
     # Read the CSV file into a pandas DataFrame
     return pd.read_csv(file_name)
 
+
 def calculate_samples_per_second(df):
     start = df['Time'].head(1).values[0]
     stop = df['Time'].tail(1).values[0]
-    samples_per_second = len(df['Value'])/((stop - start) / 1e9)
+    samples_per_second = len(df['Value']) / ((stop - start) / 1e9)
     return samples_per_second
+
 
 def shift_to_zero(df):
     start_time = df['Time'].head(1).values[0]
@@ -33,13 +38,16 @@ def shift_to_zero(df):
     shifted_df['Time'] = shifted_df['Time'] - start_time
     return shifted_df
 
+
 def filter_values_out_of_range(values):
-    #replace to near or to far with nan
+    # replace to near or to far with nan
     values[values > out_of_range] = float('NaN')
     return values
 
+
 def convert_to_ms(time):
     return time / 1e6
+
 
 def get_asc_desc_frames(df):
     # Initialize empty DataFrames for A and B
@@ -73,8 +81,10 @@ def get_asc_desc_frames(df):
 
     return ascending_frames, descending_frames
 
+
 def plot_raw(time, values, color):
-    plt.plot(time_ms, values, color=color, label='base')
+    plt.plot(time, values, color=color, label='base')
+
 
 def plot_raw_shifted(time, values, color):
     time_ms = convert_to_ms(time)
@@ -83,7 +93,7 @@ def plot_raw_shifted(time, values, color):
 
 
 def plot_base(time, values, color):
-    #replace to near or to far with nan
+    # replace to near or to far with nan
     values[values > out_of_range] = float('NaN')
     # Convert time to milliseconds for better visualization
     time_ms = convert_to_ms(time)
@@ -105,8 +115,9 @@ def plot_asc_desc(ascending_frames, descending_frames, asc_color, desc_color):
         time_ms_desc = convert_to_ms(time_ns_desc)
         plt.scatter(time_ms_desc, values_desc, color=desc_color, label='descending values')
 
+
 def plot_cut(time, values, color):
-    #replace to near or to far with nan
+    # replace to near or to far with nan
     values[values > max_threshold] = float('NaN')
     values[values < min_threshold] = float('NaN')
     # Convert time to milliseconds for better visualization
@@ -115,7 +126,7 @@ def plot_cut(time, values, color):
     plt.plot(time_ms, values, color=color, label='cut')
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     args = parse_cli_args()
     file_name = args.file
     plot_type = args.plot_type
@@ -137,7 +148,7 @@ if __name__=="__main__":
     elif plot_type == "cut_base":
         plot_base(df_shifted['Time'], df_shifted['Value'], 'blue')
         plot_cut(df_shifted['Time'], df_shifted['Value'], 'red')
-    elif plot_type == 'raw_shifted' :
+    elif plot_type == 'raw_shifted':
         plot_raw_shifted(df_shifted['Time'], df_shifted['Value'], 'blue')
     else:
         print("Plotting raw data")
