@@ -3,12 +3,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+from sklearn.cluster import DBSCAN
 import sklearn.linear_model as lm
 import sys
 
 out_of_range = 300
-max_threshold = 8.85
-min_threshold = 6.375
+max_threshold = 8.84
+min_threshold = 6.35
 
 
 def parse_cli_args():
@@ -54,7 +55,49 @@ def convert_to_ms(time):
     return time / 1e6
 
 
-def get_asc_desc_frames(df):
+def db_scan(df):
+    df = df.dropna(subset=['Value'])
+    df_filtered = df[(df['Value'] >= min_threshold) & (df['Value'] <= max_threshold)]
+    time = df_filtered['Time']
+    time_ms = convert_to_ms(time)
+
+    df_features = pd.concat([time_ms, df_filtered['Value']], axis=1)
+
+    # Perform DBSCAN clustering
+    dbscan = DBSCAN(eps=1000, min_samples=100)  # Adjust the parameters as per your requirements
+    cluster_labels = dbscan.fit_predict(df_features)
+
+    # Add the cluster labels as a new column in the DataFrame
+    df_filtered['Cluster'] = cluster_labels
+
+    # # Plot the clusters
+    # plt.scatter(time_ms, df_filtered['Value'], c=df_filtered['Cluster'], cmap='viridis')
+    # plt.colorbar(label='Cluster')
+
+    labels = dbscan.labels_
+    # Number of clusters in labels, ignoring noise if present.
+    n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+    n_noise_ = list(labels).count(-1)
+    print("Estimated number of clusters: %d" % n_clusters_)
+    print("Estimated number of noise points: %d" % n_noise_)
+
+    # Initialize empty DataFrames for ascending and descending frames
+    ascending_frames = []
+    descending_frames = []
+    i = 0
+    # Get the unique cluster labels
+    unique_clusters = pd.Series(cluster_labels).unique()
+    for cluster_label in unique_clusters:
+        if i % 2 == 0:
+            ascending_frames.append(df_filtered[df_filtered['Cluster'] == cluster_label].drop(columns='Cluster'))
+        else:
+            descending_frames.append(df_filtered[df_filtered['Cluster'] == cluster_label].drop(columns='Cluster'))
+        i = i + 1
+
+    return ascending_frames, descending_frames
+
+
+def threashold_based_splitting(df):
     # Initialize empty DataFrames for A and B
     ascending_df = pd.DataFrame(columns=['Time', 'Value'])
     ascending_frames = []
@@ -85,6 +128,10 @@ def get_asc_desc_frames(df):
             descending_df = pd.concat([descending_df, row.to_frame().T])
 
     return ascending_frames, descending_frames
+
+
+def get_asc_desc_frames(df, cluster_algorithm):
+    return cluster_algorithm(df)
 
 
 def plot_base(time, values, color):
@@ -203,7 +250,7 @@ if __name__ == "__main__":
     df_shifted = shift_to_zero(df)
     df_shifted_filterd = filter_values_out_of_range(df_shifted)
     plot_base(df_shifted_filterd['Time'], df_shifted_filterd['Value'], 'blue')
-    ascending_frames, descending_frames = get_asc_desc_frames(df_shifted_filterd)
+    ascending_frames, descending_frames = get_asc_desc_frames(df_shifted_filterd, db_scan)
     if model == "linear":
         plot_linear_reg(ascending_frames, descending_frames, 'red')
     elif model == "linear_ransac":

@@ -87,8 +87,6 @@ def plot_dbscan(df):
     df_filtered = df[(df['Value'] >= min_threshold) & (df['Value'] <= max_threshold)]
     time = df_filtered['Time']
     time_ms = convert_to_ms(time)
-    values = df_filtered['Value']
-    plt.scatter(time_ms, values, color='blue', label='base')
 
     df_features = pd.concat([time_ms, df_filtered['Value']], axis=1)
 
