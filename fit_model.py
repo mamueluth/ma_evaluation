@@ -2,14 +2,34 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+
+import pandas
 import pandas as pd
-from sklearn.cluster import DBSCAN
 import sklearn.linear_model as lm
 import sys
 
+from dataclasses import dataclass
+from sklearn.metrics import max_error, mean_absolute_error, mean_squared_error
+from sklearn.cluster import DBSCAN
+
 out_of_range = 300
 max_threshold = 8.84
-min_threshold = 6.35
+min_threshold = 6.36
+
+
+@dataclass
+class PredictionResult:
+    preditor: str
+    num: int
+    score: float
+    coeff: float
+    frame: pandas.DataFrame
+
+
+@dataclass
+class Results:
+    ascending_frame_results: list
+    descending_frame_results: list
 
 
 def parse_cli_args():
@@ -18,6 +38,8 @@ def parse_cli_args():
     parser.add_argument('--model', '-m', type=str, choices=['linear', 'ransac', 'linear_ransac'], default='',
                         help='Which model is fit to the data.')
     parser.add_argument('--debug', '-d', action='store_true',
+                        help='If debug is set the ascending and descending data frames are shown.')
+    parser.add_argument('--debug_outlier', '-do', action='store_true',
                         help='If debug is set the ascending and descending data frames are shown.')
     parser.add_argument('--asc_desc', '-ad', action='store_true',
                         help='If this flag is set is set the ascending and descending data frames are shown.')
@@ -55,7 +77,7 @@ def convert_to_ms(time):
     return time / 1e6
 
 
-def db_scan(df):
+def db_scan(df, debug):
     df = df.dropna(subset=['Value'])
     df_filtered = df[(df['Value'] >= min_threshold) & (df['Value'] <= max_threshold)]
     time = df_filtered['Time']
@@ -70,9 +92,10 @@ def db_scan(df):
     # Add the cluster labels as a new column in the DataFrame
     df_filtered['Cluster'] = cluster_labels
 
-    # # Plot the clusters
-    # plt.scatter(time_ms, df_filtered['Value'], c=df_filtered['Cluster'], cmap='viridis')
-    # plt.colorbar(label='Cluster')
+    if debug:
+        # # Plot the clusters
+        plt.scatter(time_ms, df_filtered['Value'], c=df_filtered['Cluster'], cmap='viridis')
+        plt.colorbar(label='Cluster')
 
     labels = dbscan.labels_
     # Number of clusters in labels, ignoring noise if present.
@@ -97,7 +120,7 @@ def db_scan(df):
     return ascending_frames, descending_frames
 
 
-def threashold_based_splitting(df):
+def threashold_based_splitting(df, debug):
     # Initialize empty DataFrames for A and B
     ascending_df = pd.DataFrame(columns=['Time', 'Value'])
     ascending_frames = []
@@ -130,8 +153,8 @@ def threashold_based_splitting(df):
     return ascending_frames, descending_frames
 
 
-def get_asc_desc_frames(df, cluster_algorithm):
-    return cluster_algorithm(df)
+def get_asc_desc_frames(df, cluster_algorithm, debug):
+    return cluster_algorithm(df, debug)
 
 
 def plot_base(time, values, color):
@@ -139,88 +162,142 @@ def plot_base(time, values, color):
     plt.plot(time_ms, values, color=color, label='base')
 
 
-def plot_linear_reg(ascending_frames, descending_frames, color):
+def linear_reg(ascending_frames, descending_frames):
     # ascending values and time
-    for asc_df in ascending_frames:
+    ascending_frame_results = []
+    for i, asc_df in enumerate(ascending_frames):
         time_ns_asc = asc_df[['Time']]
         values_asc = asc_df[['Value']]
         time_ms_asc = convert_to_ms(time_ns_asc)
         # plt.scatter(time_ms_asc, values_asc, color='green', label='ascending values')
         lin_reg = lm.LinearRegression()
         lin_reg.fit(time_ms_asc, values_asc)
-        plt.plot(time_ms_asc, lin_reg.predict(time_ms_asc), color=color, linewidth=1)
+        asc_df['Prediction'] = lin_reg.predict(time_ms_asc)
+        ascending_frame_results.append(
+            PredictionResult("ransac", i, lin_reg.score(time_ms_asc, values_asc), lin_reg.coef_, asc_df))
         print(f"Linear Regression asc Score: {lin_reg.score(time_ms_asc, values_asc)}")
         print(f"Linear Regression asc coef: {lin_reg.coef_}")
     # descending values and time
-    for desc_df in descending_frames:
+    descending_frame_results = []
+    for i, desc_df in enumerate(descending_frames):
         time_ns_desc = desc_df[['Time']]
         values_desc = desc_df[['Value']]
         time_ms_desc = convert_to_ms(time_ns_desc)
         # plt.scatter(time_ms_desc, values_desc, color='red', label='descending values')
         lin_reg = lm.LinearRegression()
         lin_reg.fit(time_ms_desc, values_desc)
-        plt.plot(time_ms_desc, lin_reg.predict(time_ms_desc), color=color, linewidth=1)
+        desc_df['Prediction'] = lin_reg.predict(time_ms_desc)
+        descending_frame_results.append(
+            PredictionResult("ransac", i, lin_reg.score(time_ms_desc, values_desc), lin_reg.coef_, desc_df))
         print(f"Linear Regression des Params: {lin_reg.score(time_ms_desc, values_desc)}")
         print(f"Linear Regression des coef: {lin_reg.coef_}")
 
-
-def plot_ransac_raw(df, color, debug):
-    df = df.dropna(subset=['Value'])
-    time = df[['Time']]
-    values = df[['Value']]
-    time_ms = convert_to_ms(time)
-    ransac = lm.RANSACRegressor()
-    ransac.fit(time, values)
-    plt.plot(time_ms, ransac.predict(time_ms), color=color, linewidth=1)
-    print(f"Ransac asc Score: {ransac.score(time_ms, values)}")
-    print(f"Ransac asc coef: {ransac.estimator_.coef_}")
-    if (debug):
-        # plt.scatter(time_ms_asc, values_asc, color='green', label='ascending values')
-        inlier_mask = ransac.inlier_mask_
-        outlier_mask = np.logical_not(inlier_mask)
-        plt.scatter(time_ms[inlier_mask], values[inlier_mask], c='steelblue', edgecolor='white', marker='o',
-                    label='Inliers')
-        plt.scatter(time_ms[outlier_mask], values[outlier_mask], c='limegreen', edgecolor='white',
-                    marker='s', label='Outliers')
+    return Results(ascending_frame_results, descending_frame_results)
 
 
-def plot_ransac(ascending_frames, descending_frames, color, debug):
+def plot_predicted_line(title, df_shifted_filterd, result, color, show_asc_desc_frame):
+    plt.figure()
+    plt.title(title)
+    plt.grid(True)
+    plot_base(df_shifted_filterd['Time'], df_shifted_filterd['Value'], 'blue')
+    for asc_frame_result in result.ascending_frame_results:
+        plt.plot(convert_to_ms(asc_frame_result.frame['Time']), asc_frame_result.frame['Prediction'], color=color,
+                 linewidth=1)
+    for desc_frame_result in result.descending_frame_results:
+        plt.plot(convert_to_ms(desc_frame_result.frame['Time']), desc_frame_result.frame['Prediction'], color=color,
+                 linewidth=1)
+    if show_asc_desc_frame:
+        plot_asc_desc(ascending_frames, descending_frames, 'green', 'yellow')
+
+    plt.xlabel('Time (ms)')
+    plt.ylabel('Value')
+
+
+def plot_result(title, result):
+    fig, axes = plt.subplots(ncols=len(result.ascending_frame_results))
+    fig.suptitle(title + " Ascending")
+    for i, asc_frame_result in enumerate(result.ascending_frame_results):
+        values = asc_frame_result.frame['Value']
+        predictions = asc_frame_result.frame['Prediction']
+        print(f"max_error:{max_error(values, predictions)}")
+        print(f"mean_absolute_error:{mean_absolute_error(values, predictions)}")
+        print(f"mean_squared_error:{mean_squared_error(values, predictions)}")
+        deviation = values - predictions
+        axes[i].boxplot(deviation)
+        axes[i].text(0.5, -0.12, f'Score: {asc_frame_result.score}', transform=axes[i].transAxes, ha='center',
+                     fontsize=10)
+        axes[i].text(0.5, -0.15, f'Coefficients {asc_frame_result.coeff[0][0]}', transform=axes[i].transAxes,
+                     ha='center', fontsize=10)
+        mse = mean_squared_error(values, predictions)
+        axes[i].text(0.5, -0.18, f'MSE {mse}', transform=axes[i].transAxes, ha='center', fontsize=10)
+        axes[i].set_xlabel('Deviation')
+        axes[i].set_ylabel('Values')
+        axes[i].set_title(f'Boxplot of Deviation {i + 1}')
+
+    fig, axes = plt.subplots(ncols=len(result.ascending_frame_results))
+    fig.suptitle(title + " Descending")
+    for i, desc_frame_result in enumerate(result.descending_frame_results):
+        values = desc_frame_result.frame['Value']
+        predictions = desc_frame_result.frame['Prediction']
+        print(f"max_error:{max_error(values, predictions)}")
+        print(f"mean_absolute_error:{mean_absolute_error(values, predictions)}")
+        print(f"mean_squared_error:{mean_squared_error(values, predictions)}")
+        deviation = values - predictions
+        axes[i].boxplot(deviation)
+        axes[i].text(0.5, -0.12, f'Score: {desc_frame_result.score}', transform=axes[i].transAxes, ha='center',
+                     fontsize=10)
+        axes[i].text(0.5, -0.15, f'Coefficients {desc_frame_result.coeff[0][0]}', transform=axes[i].transAxes,
+                     ha='center', fontsize=10)
+        mse = mean_squared_error(values, predictions)
+        axes[i].text(0.5, -0.18, f'MSE {mse}', transform=axes[i].transAxes, ha='center', fontsize=10)
+        axes[i].set_xlabel('Deviation')
+        axes[i].set_ylabel('Values')
+        axes[i].set_title(f'Boxplot of Deviation {i + 1}')
+
+
+def ransac(ascending_frames, descending_frames, debug):
     # ascending values and time
-    for asc_df in ascending_frames:
+    ascending_frame_results = []
+    for i, asc_df in enumerate(ascending_frames):
         time_ns_asc = asc_df[['Time']]
         values_asc = asc_df[['Value']]
         time_ms_asc = convert_to_ms(time_ns_asc)
         ransac = lm.RANSACRegressor()
         ransac.fit(time_ms_asc, values_asc)
-        plt.plot(time_ms_asc, ransac.predict(time_ms_asc), color=color, linewidth=1)
+        asc_df['Prediction'] = ransac.predict(time_ms_asc)
+        ascending_frame_results.append(
+            PredictionResult("ransac", i, ransac.score(time_ms_asc, values_asc), ransac.estimator_.coef_, asc_df))
         print(f"Ransac asc Score: {ransac.score(time_ms_asc, values_asc)}")
         print(f"Ransac asc coef: {ransac.estimator_.coef_}")
         if (debug):
             # plt.scatter(time_ms_asc, values_asc, color='green', label='ascending values')
             inlier_mask = ransac.inlier_mask_
             outlier_mask = np.logical_not(inlier_mask)
-            plt.scatter(time_ms_asc[inlier_mask], values_asc[inlier_mask], c='steelblue', edgecolor='white', marker='o',
-                        label='Inliers')
-            plt.scatter(time_ms_asc[outlier_mask], values_asc[outlier_mask], c='limegreen', edgecolor='white',
-                        marker='s', label='Outliers')
+            plt.scatter(time_ms_asc[inlier_mask], values_asc[inlier_mask], c='steelblue', marker='o', label='Inliers')
+            plt.scatter(time_ms_asc[outlier_mask], values_asc[outlier_mask], c='limegreen', marker='s',
+                        label='Outliers')
     # descending values and time
-    for desc_df in descending_frames:
+    descending_frame_results = []
+    for i, desc_df in enumerate(descending_frames):
         time_ns_desc = desc_df[['Time']]
         values_desc = desc_df[['Value']]
         time_ms_desc = convert_to_ms(time_ns_desc)
         ransac = lm.RANSACRegressor()
         ransac.fit(time_ms_desc, values_desc)
-        plt.plot(time_ms_desc, ransac.predict(time_ms_desc), color=color, linewidth=1)
+        desc_df['Prediction'] = ransac.predict(time_ms_desc)
+        descending_frame_results.append(
+            PredictionResult("ransac", i, ransac.score(time_ms_desc, values_desc), ransac.estimator_.coef_, desc_df))
         print(f"Ransac des Params: {ransac.score(time_ms_desc, values_desc)}")
         print(f"Ransac des coef: {ransac.estimator_.coef_}")
         if (debug):
             # plt.scatter(time_ms_desc, values_desc, color='red', label='descending values')
             inlier_mask = ransac.inlier_mask_
             outlier_mask = np.logical_not(inlier_mask)
-            plt.scatter(time_ms_desc[inlier_mask], values_desc[inlier_mask], c='steelblue', edgecolor='white',
-                        marker='o', label='Inliers')
-            plt.scatter(time_ms_desc[outlier_mask], values_desc[outlier_mask], c='limegreen', edgecolor='white',
-                        marker='s', label='Outliers')
+            plt.scatter(time_ms_desc[inlier_mask], values_desc[inlier_mask], c='steelblue', marker='o', label='Inliers')
+            plt.scatter(time_ms_desc[outlier_mask], values_desc[outlier_mask], c='limegreen', marker='s',
+                        label='Outliers')
+
+    return Results(ascending_frame_results, descending_frame_results)
 
 
 def plot_asc_desc(ascending_frames, descending_frames, asc_color, desc_color):
@@ -243,28 +320,29 @@ if __name__ == "__main__":
     file_name = args.file
     model = args.model
     debug = args.debug
+    debug_outlier = args.debug_outlier
     show_asc_desc_frame = args.asc_desc
 
     df = read_values(file_name)
     samples_per_second = calculate_samples_per_second(df)
+    filename_without_extension = os.path.splitext(file_name)[0]
+    title = filename_without_extension + f" | [samples per second {samples_per_second}]"
     df_shifted = shift_to_zero(df)
     df_shifted_filterd = filter_values_out_of_range(df_shifted)
-    plot_base(df_shifted_filterd['Time'], df_shifted_filterd['Value'], 'blue')
-    ascending_frames, descending_frames = get_asc_desc_frames(df_shifted_filterd, db_scan)
+    ascending_frames, descending_frames = get_asc_desc_frames(df_shifted_filterd, db_scan, debug_outlier)
     if model == "linear":
-        plot_linear_reg(ascending_frames, descending_frames, 'red')
+        result = linear_reg(ascending_frames, descending_frames)
+        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+        plot_result(title, result)
     elif model == "linear_ransac":
-        plot_linear_reg(ascending_frames, descending_frames, 'orange')
-        plot_ransac(ascending_frames, descending_frames, 'red', debug)
+        result = linear_reg(ascending_frames, descending_frames)
+        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+        plot_result(title, result)
+        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+        plot_result(title, result)
     else:
-        plot_ransac(ascending_frames, descending_frames, 'red', debug)
+        result = ransac(ascending_frames, descending_frames, debug)
+        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+        plot_result(title, result)
 
-    if (show_asc_desc_frame):
-        plot_asc_desc(ascending_frames, descending_frames, 'green', 'yellow')
-
-    plt.xlabel('Time (ms)')
-    plt.ylabel('Value')
-    filename_without_extension = os.path.splitext(file_name)[0]
-    plt.title(filename_without_extension + f" | [samples per second {samples_per_second}]")
-    plt.grid(True)
     plt.show()
