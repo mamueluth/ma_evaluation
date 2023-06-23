@@ -77,6 +77,10 @@ def convert_to_ms(time):
     return time / 1e6
 
 
+def convert_to_s(time):
+    return time / 1e9
+
+
 def db_scan(df, debug):
     df = df.dropna(subset=['Value'])
     df_filtered = df[(df['Value'] >= min_threshold) & (df['Value'] <= max_threshold)]
@@ -158,8 +162,8 @@ def get_asc_desc_frames(df, cluster_algorithm, debug):
 
 
 def plot_base(time, values, color):
-    time_ms = convert_to_ms(time)
-    plt.plot(time_ms, values, color=color, label='base')
+    time_s = convert_to_s(time)
+    plt.plot(time_s, values, color=color, label='base')
 
 
 def linear_reg(ascending_frames, descending_frames):
@@ -201,22 +205,24 @@ def plot_predicted_line(title, df_shifted_filterd, result, color, show_asc_desc_
     plt.grid(True)
     plot_base(df_shifted_filterd['Time'], df_shifted_filterd['Value'], 'blue')
     for asc_frame_result in result.ascending_frame_results:
-        plt.plot(convert_to_ms(asc_frame_result.frame['Time']), asc_frame_result.frame['Prediction'], color=color,
-                 linewidth=1)
+        plt.plot(convert_to_s(asc_frame_result.frame['Time']), asc_frame_result.frame['Prediction'], color=color,
+                 linewidth=2)
     for desc_frame_result in result.descending_frame_results:
-        plt.plot(convert_to_ms(desc_frame_result.frame['Time']), desc_frame_result.frame['Prediction'], color=color,
-                 linewidth=1)
+        plt.plot(convert_to_s(desc_frame_result.frame['Time']), desc_frame_result.frame['Prediction'], color=color,
+                 linewidth=2)
     if show_asc_desc_frame:
         plot_asc_desc(ascending_frames, descending_frames, 'green', 'yellow')
 
-    plt.xlabel('Time (ms)')
-    plt.ylabel('Value')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Distance (mm)')
 
 
 def plot_result(title, result):
+    y_min = -0.3
+    y_max = 0.2
     fig, axes = plt.subplots(ncols=len(result.ascending_frame_results))
     fig.suptitle(title + " Ascending")
-    fig.subplots_adjust(bottom=0.2)
+    fig.subplots_adjust(left=0.092, right=0.92, wspace=0.29, bottom=0.2)
     for i, asc_frame_result in enumerate(result.ascending_frame_results):
         values = asc_frame_result.frame['Value']
         predictions = asc_frame_result.frame['Prediction']
@@ -224,20 +230,22 @@ def plot_result(title, result):
         print(f"mean_absolute_error:{mean_absolute_error(values, predictions)}")
         print(f"mean_squared_error:{mean_squared_error(values, predictions)}")
         deviation = values - predictions
-        axes[i].boxplot(deviation)
+        axes[i].boxplot(deviation, widths=0.4)
+        axes[i].set_ylim(y_min, y_max)
+        axes[i].grid(True)
         axes[i].text(0.5, -0.12, f'Score: {round(asc_frame_result.score, 4)}', transform=axes[i].transAxes, ha='center',
                      fontsize=10)
         axes[i].text(0.5, -0.15, f'Coefficients {round(asc_frame_result.coeff[0][0], 7)}', transform=axes[i].transAxes,
                      ha='center', fontsize=10)
         mse = mean_squared_error(values, predictions)
         axes[i].text(0.5, -0.18, f'MSE {round(mse, 7)}', transform=axes[i].transAxes, ha='center', fontsize=10)
-        axes[i].set_xlabel('Deviation')
         axes[i].set_ylabel('Values')
         axes[i].set_title(f'Boxplot of Deviation {i + 1}')
 
-    fig, axes = plt.subplots(ncols=len(result.ascending_frame_results))
+    fig, axes = plt.subplots(ncols=len(result.ascending_frame_results), figsize=(12, 6),
+                             gridspec_kw={'width_ratios': [2, 2, 2]})
     fig.suptitle(title + " Descending")
-    fig.subplots_adjust(bottom=0.2)
+    fig.subplots_adjust(left=0.092, right=0.92, wspace=0.29, bottom=0.2)
     for i, desc_frame_result in enumerate(result.descending_frame_results):
         values = desc_frame_result.frame['Value']
         predictions = desc_frame_result.frame['Prediction']
@@ -245,14 +253,16 @@ def plot_result(title, result):
         print(f"mean_absolute_error:{mean_absolute_error(values, predictions)}")
         print(f"mean_squared_error:{mean_squared_error(values, predictions)}")
         deviation = values - predictions
-        axes[i].boxplot(deviation)
-        axes[i].text(0.5, -0.12, f'Score: {round(desc_frame_result.score, 4)}', transform=axes[i].transAxes, ha='center',
+        axes[i].boxplot(deviation, widths=0.4)
+        axes[i].set_ylim(y_min, y_max)
+        axes[i].grid(True)
+        axes[i].text(0.5, -0.12, f'Score: {round(desc_frame_result.score, 4)}', transform=axes[i].transAxes,
+                     ha='center',
                      fontsize=10)
         axes[i].text(0.5, -0.15, f'Coefficients {round(desc_frame_result.coeff[0][0], 7)}', transform=axes[i].transAxes,
                      ha='center', fontsize=10)
         mse = mean_squared_error(values, predictions)
         axes[i].text(0.5, -0.18, f'MSE {round(mse, 7)}', transform=axes[i].transAxes, ha='center', fontsize=10)
-        axes[i].set_xlabel('Deviation')
         axes[i].set_ylabel('Values')
         axes[i].set_title(f'Boxplot of Deviation {i + 1}')
 
