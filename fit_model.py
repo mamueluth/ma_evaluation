@@ -216,6 +216,7 @@ def plot_predicted_line(title, df_shifted_filterd, result, color, show_asc_desc_
 def plot_result(title, result):
     fig, axes = plt.subplots(ncols=len(result.ascending_frame_results))
     fig.suptitle(title + " Ascending")
+    fig.subplots_adjust(bottom=0.2)
     for i, asc_frame_result in enumerate(result.ascending_frame_results):
         values = asc_frame_result.frame['Value']
         predictions = asc_frame_result.frame['Prediction']
@@ -224,18 +225,19 @@ def plot_result(title, result):
         print(f"mean_squared_error:{mean_squared_error(values, predictions)}")
         deviation = values - predictions
         axes[i].boxplot(deviation)
-        axes[i].text(0.5, -0.12, f'Score: {asc_frame_result.score}', transform=axes[i].transAxes, ha='center',
+        axes[i].text(0.5, -0.12, f'Score: {round(asc_frame_result.score, 4)}', transform=axes[i].transAxes, ha='center',
                      fontsize=10)
-        axes[i].text(0.5, -0.15, f'Coefficients {asc_frame_result.coeff[0][0]}', transform=axes[i].transAxes,
+        axes[i].text(0.5, -0.15, f'Coefficients {round(asc_frame_result.coeff[0][0], 7)}', transform=axes[i].transAxes,
                      ha='center', fontsize=10)
         mse = mean_squared_error(values, predictions)
-        axes[i].text(0.5, -0.18, f'MSE {mse}', transform=axes[i].transAxes, ha='center', fontsize=10)
+        axes[i].text(0.5, -0.18, f'MSE {round(mse, 7)}', transform=axes[i].transAxes, ha='center', fontsize=10)
         axes[i].set_xlabel('Deviation')
         axes[i].set_ylabel('Values')
         axes[i].set_title(f'Boxplot of Deviation {i + 1}')
 
     fig, axes = plt.subplots(ncols=len(result.ascending_frame_results))
     fig.suptitle(title + " Descending")
+    fig.subplots_adjust(bottom=0.2)
     for i, desc_frame_result in enumerate(result.descending_frame_results):
         values = desc_frame_result.frame['Value']
         predictions = desc_frame_result.frame['Prediction']
@@ -244,12 +246,12 @@ def plot_result(title, result):
         print(f"mean_squared_error:{mean_squared_error(values, predictions)}")
         deviation = values - predictions
         axes[i].boxplot(deviation)
-        axes[i].text(0.5, -0.12, f'Score: {desc_frame_result.score}', transform=axes[i].transAxes, ha='center',
+        axes[i].text(0.5, -0.12, f'Score: {round(desc_frame_result.score, 4)}', transform=axes[i].transAxes, ha='center',
                      fontsize=10)
-        axes[i].text(0.5, -0.15, f'Coefficients {desc_frame_result.coeff[0][0]}', transform=axes[i].transAxes,
+        axes[i].text(0.5, -0.15, f'Coefficients {round(desc_frame_result.coeff[0][0], 7)}', transform=axes[i].transAxes,
                      ha='center', fontsize=10)
         mse = mean_squared_error(values, predictions)
-        axes[i].text(0.5, -0.18, f'MSE {mse}', transform=axes[i].transAxes, ha='center', fontsize=10)
+        axes[i].text(0.5, -0.18, f'MSE {round(mse, 7)}', transform=axes[i].transAxes, ha='center', fontsize=10)
         axes[i].set_xlabel('Deviation')
         axes[i].set_ylabel('Values')
         axes[i].set_title(f'Boxplot of Deviation {i + 1}')
@@ -326,7 +328,7 @@ if __name__ == "__main__":
     df = read_values(file_name)
     samples_per_second = calculate_samples_per_second(df)
     filename_without_extension = os.path.splitext(file_name)[0]
-    title = filename_without_extension + f" | [samples per second {samples_per_second}]"
+    title = filename_without_extension + f" [{round(samples_per_second, 1)} sps]"
     df_shifted = shift_to_zero(df)
     df_shifted_filterd = filter_values_out_of_range(df_shifted)
     ascending_frames, descending_frames = get_asc_desc_frames(df_shifted_filterd, db_scan, debug_outlier)
