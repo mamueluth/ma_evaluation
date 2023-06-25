@@ -16,6 +16,8 @@ out_of_range = 300
 max_threshold = 8.84
 min_threshold = 6.36
 
+out_file="table.csv"
+first_line=
 
 @dataclass
 class PredictionResult:
@@ -163,7 +165,7 @@ def get_asc_desc_frames(df, cluster_algorithm, debug):
 
 def plot_base(time, values, color):
     time_s = convert_to_s(time)
-    plt.plot(time_s, values, color=color, label='base')
+    plt.plot(time_s, values, color=color, label='base', linewidth=3)
 
 
 def linear_reg(ascending_frames, descending_frames):
@@ -201,7 +203,7 @@ def linear_reg(ascending_frames, descending_frames):
 
 def plot_predicted_line(title, df_shifted_filterd, result, color, show_asc_desc_frame):
     plt.figure()
-    plt.title(title)
+    plt.title(title, fontsize=20, fontweight='bold')
     plt.grid(True)
     plot_base(df_shifted_filterd['Time'], df_shifted_filterd['Value'], 'blue')
     for asc_frame_result in result.ascending_frame_results:
@@ -213,15 +215,74 @@ def plot_predicted_line(title, df_shifted_filterd, result, color, show_asc_desc_
     if show_asc_desc_frame:
         plot_asc_desc(ascending_frames, descending_frames, 'green', 'yellow')
 
-    plt.xlabel('Time (s)')
-    plt.ylabel('Distance (mm)')
+    plt.xticks(fontsize=18, fontweight='bold')
+    plt.yticks(fontsize=18, fontweight='bold')
+    plt.xlabel('Time (s)', fontsize=24, fontweight='bold')
+    plt.ylabel('Distance (mm)', fontsize=24, fontweight='bold')
+    plt.subplots_adjust(left=0.06, right=0.99, bottom=0.075, top=0.96)
+def export_as_table(result):
+
+
+def plot_result_aio(title, result):
+    y_min = -0.3
+    y_max = 0.2
+    fig, axes = plt.subplots(ncols=len(result.ascending_frame_results) + len(result.descending_frame_results),
+                             figsize=(12, 6))
+    fig.suptitle(title + " Ascending & Descending", fontsize=18)
+    fig.subplots_adjust(left=0.05, right=0.97, wspace=0.55, bottom=0.18)
+    for i, asc_frame_result in enumerate(result.ascending_frame_results):
+        values = asc_frame_result.frame['Value']
+        predictions = asc_frame_result.frame['Prediction']
+        print(f"max_error:{max_error(values, predictions)}")
+        print(f"mean_absolute_error:{mean_absolute_error(values, predictions)}")
+        print(f"mean_squared_error:{mean_squared_error(values, predictions)}")
+        deviation = values - predictions
+        axes[i].boxplot(deviation, widths=0.4)
+        axes[i].set_ylim(y_min, y_max)
+        axes[i].grid(True)
+        axes[i].tick_params(axis='x', labelsize=16)
+        axes[i].tick_params(axis='y', labelsize=16)
+        axes[i].text(0.5, -0.10, f'Score: {round(asc_frame_result.score, 3)}', transform=axes[i].transAxes, ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.14, f'Coeff. {round(asc_frame_result.coeff[0][0], 7) * 1e3:.3f} x 1e-3',
+                     transform=axes[i].transAxes,
+                     ha='center', fontsize=16, fontweight='bold')
+        mse = mean_squared_error(values, predictions)
+        axes[i].text(0.5, -0.18, f'MSE {round(mse, 7) * 1e3:.3f} x 1e-3', transform=axes[i].transAxes, ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].set_ylabel('Values', fontsize=16)
+        axes[i].set_title(f'Ascending Deviation {i + 1}\n', fontsize=16)
+
+    for i, desc_frame_result in enumerate(result.descending_frame_results, start=len(result.ascending_frame_results)):
+        values = desc_frame_result.frame['Value']
+        predictions = desc_frame_result.frame['Prediction']
+        print(f"max_error:{max_error(values, predictions)}")
+        print(f"mean_absolute_error:{mean_absolute_error(values, predictions)}")
+        print(f"mean_squared_error:{mean_squared_error(values, predictions)}")
+        deviation = values - predictions
+        axes[i].boxplot(deviation, widths=0.4)
+        axes[i].set_ylim(y_min, y_max)
+        axes[i].grid(True)
+        axes[i].tick_params(axis='x', labelsize=16)
+        axes[i].tick_params(axis='y', labelsize=16)
+        axes[i].text(0.5, -0.10, f'Score: {round(desc_frame_result.score, 3)}', transform=axes[i].transAxes,
+                     ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.14, f'Coeff. {round(desc_frame_result.coeff[0][0], 7) * 1e3:.3f} x 1e-3',
+                     transform=axes[i].transAxes,
+                     ha='center', fontsize=16, fontweight='bold')
+        mse = mean_squared_error(values, predictions)
+        axes[i].text(0.5, -0.18, f'MSE {round(mse, 7) * 1e3:.3f} x 1e-3', transform=axes[i].transAxes, ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].set_ylabel('Values', fontsize=16)
+        axes[i].set_title(f'Descending Deviation {i + 1 - len(result.ascending_frame_results)}\n', fontsize=16)
 
 
 def plot_result(title, result):
     y_min = -0.3
     y_max = 0.2
     fig, axes = plt.subplots(ncols=len(result.ascending_frame_results))
-    fig.suptitle(title + " Ascending")
+    fig.suptitle(title + " Ascending", fontsize=18)
     fig.subplots_adjust(left=0.092, right=0.92, wspace=0.29, bottom=0.2)
     for i, asc_frame_result in enumerate(result.ascending_frame_results):
         values = asc_frame_result.frame['Value']
@@ -233,18 +294,19 @@ def plot_result(title, result):
         axes[i].boxplot(deviation, widths=0.4)
         axes[i].set_ylim(y_min, y_max)
         axes[i].grid(True)
-        axes[i].text(0.5, -0.12, f'Score: {round(asc_frame_result.score, 4)}', transform=axes[i].transAxes, ha='center',
-                     fontsize=10)
-        axes[i].text(0.5, -0.15, f'Coefficients {round(asc_frame_result.coeff[0][0], 7)}', transform=axes[i].transAxes,
-                     ha='center', fontsize=10)
+        axes[i].text(0.5, -0.10, f'Score: {round(asc_frame_result.score, 3)}', transform=axes[i].transAxes, ha='center',
+                     fontsize=16)
+        axes[i].text(0.5, -0.14, f'Coefficients {round(asc_frame_result.coeff[0][0], 7) * 1e3:.3f} x 1e-3',
+                     transform=axes[i].transAxes,
+                     ha='center', fontsize=16)
         mse = mean_squared_error(values, predictions)
-        axes[i].text(0.5, -0.18, f'MSE {round(mse, 7)}', transform=axes[i].transAxes, ha='center', fontsize=10)
+        axes[i].text(0.5, -0.18, f'MSE {round(mse, 7) * 1e3:.3f} x 1e-3', transform=axes[i].transAxes, ha='center',
+                     fontsize=16)
         axes[i].set_ylabel('Values')
         axes[i].set_title(f'Boxplot of Deviation {i + 1}')
 
-    fig, axes = plt.subplots(ncols=len(result.ascending_frame_results), figsize=(12, 6),
-                             gridspec_kw={'width_ratios': [2, 2, 2]})
-    fig.suptitle(title + " Descending")
+    fig, axes = plt.subplots(ncols=len(result.descending_frame_results), figsize=(12, 6))
+    fig.suptitle(title + " Descending", fontsize=18)
     fig.subplots_adjust(left=0.092, right=0.92, wspace=0.29, bottom=0.2)
     for i, desc_frame_result in enumerate(result.descending_frame_results):
         values = desc_frame_result.frame['Value']
@@ -256,13 +318,15 @@ def plot_result(title, result):
         axes[i].boxplot(deviation, widths=0.4)
         axes[i].set_ylim(y_min, y_max)
         axes[i].grid(True)
-        axes[i].text(0.5, -0.12, f'Score: {round(desc_frame_result.score, 4)}', transform=axes[i].transAxes,
+        axes[i].text(0.5, -0.10, f'Score: {round(desc_frame_result.score, 3)}', transform=axes[i].transAxes,
                      ha='center',
-                     fontsize=10)
-        axes[i].text(0.5, -0.15, f'Coefficients {round(desc_frame_result.coeff[0][0], 7)}', transform=axes[i].transAxes,
-                     ha='center', fontsize=10)
+                     fontsize=16)
+        axes[i].text(0.5, -0.14, f'Coefficients {round(desc_frame_result.coeff[0][0], 7) * 1e3:.3f} x 1e-3',
+                     transform=axes[i].transAxes,
+                     ha='center', fontsize=16)
         mse = mean_squared_error(values, predictions)
-        axes[i].text(0.5, -0.18, f'MSE {round(mse, 7)}', transform=axes[i].transAxes, ha='center', fontsize=10)
+        axes[i].text(0.5, -0.18, f'MSE {round(mse, 7) * 1e3:.3f} x 1e-3', transform=axes[i].transAxes, ha='center',
+                     fontsize=16)
         axes[i].set_ylabel('Values')
         axes[i].set_title(f'Boxplot of Deviation {i + 1}')
 
@@ -355,6 +419,6 @@ if __name__ == "__main__":
     else:
         result = ransac(ascending_frames, descending_frames, debug)
         plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
-        plot_result(title, result)
+        plot_result_aio(title, result)
 
     plt.show()

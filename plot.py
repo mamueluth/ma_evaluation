@@ -6,7 +6,7 @@ from sklearn.cluster import DBSCAN
 import sys
 
 out_of_range = 300
-max_threshold = 8.9
+max_threshold = 8.84
 min_threshold = 6.36
 
 
