@@ -180,7 +180,7 @@ def linear_reg(ascending_frames, descending_frames):
         lin_reg.fit(time_ms_asc, values_asc)
         asc_df['Prediction'] = lin_reg.predict(time_ms_asc)
         ascending_frame_results.append(
-            PredictionResult("ransac", i, lin_reg.score(time_ms_asc, values_asc), lin_reg.coef_, asc_df))
+            PredictionResult("linear_reg", i, lin_reg.score(time_ms_asc, values_asc), lin_reg.coef_, asc_df))
         print(f"Linear Regression asc Score: {lin_reg.score(time_ms_asc, values_asc)}")
         print(f"Linear Regression asc coef: {lin_reg.coef_}")
     # descending values and time
@@ -194,7 +194,7 @@ def linear_reg(ascending_frames, descending_frames):
         lin_reg.fit(time_ms_desc, values_desc)
         desc_df['Prediction'] = lin_reg.predict(time_ms_desc)
         descending_frame_results.append(
-            PredictionResult("ransac", i, lin_reg.score(time_ms_desc, values_desc), lin_reg.coef_, desc_df))
+            PredictionResult("linear_reg", i, lin_reg.score(time_ms_desc, values_desc), lin_reg.coef_, desc_df))
         print(f"Linear Regression des Params: {lin_reg.score(time_ms_desc, values_desc)}")
         print(f"Linear Regression des coef: {lin_reg.coef_}")
 
@@ -228,7 +228,7 @@ def plot_result_aio(title, result):
     fig, axes = plt.subplots(ncols=len(result.ascending_frame_results) + len(result.descending_frame_results),
                              figsize=(12, 6))
     fig.suptitle(title + " Ascending & Descending", fontsize=18)
-    fig.subplots_adjust(left=0.05, right=0.97, wspace=0.55, bottom=0.231)
+    fig.subplots_adjust(left=0.05, right=0.97, wspace=0.55, bottom=0.27)
     print(5 * "#" + "_ASCENDING_" + 5 * "#")
     for i, asc_frame_result in enumerate(result.ascending_frame_results):
         values = asc_frame_result.frame['Value']
@@ -241,11 +241,15 @@ def plot_result_aio(title, result):
         min_val = boxplot_dict['whiskers'][0].get_ydata()[1]
         max_val = boxplot_dict['whiskers'][1].get_ydata()[1]
         mean = boxplot_dict['medians'][0].get_ydata()[0]
+        q1_value = boxplot_dict['boxes'][0].get_ydata()[1]
+        q3_value = boxplot_dict['boxes'][0].get_ydata()[2]
         outliers = [flier.get_ydata() for flier in boxplot_dict['fliers']]
         num_outliers = reduce(add, [len(outlier) for outlier in outliers])
         print(f"{i} asc Minimum: {min_val:.5f}")
         print(f"{i} asc Maximum: {max_val:.5f}")
+        print(f"{i} asc Q1: {q1_value:.5f}")
         print(f"{i} asc Mean: {mean:.5f}")
+        print(f"{i} asc Q3: {q3_value:.5f}")
         print(f"{i} asc Number of Outliers: {num_outliers}")
         print("\n")
         axes[i].set_ylim(y_min, y_max)
@@ -254,25 +258,30 @@ def plot_result_aio(title, result):
         axes[i].tick_params(axis='y', labelsize=16)
         axes[i].text(0.5, -0.10, f'Min.: {round(min_val, 3)}', transform=axes[i].transAxes, ha='center',
                      fontsize=16, fontweight='bold')
-        axes[i].text(0.5, -0.14, f'Max.: {round(max_val, 3):.3f}',
+        axes[i].text(0.5, -0.14, f'Max.: {round(max_val, 3)}',
+                     transform=axes[i].transAxes,
+                     ha='center', fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.18, f'Q1: {round(q1_value, 3)}', transform=axes[i].transAxes, ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.22, f'Mean: {round(mean, 3)}', transform=axes[i].transAxes, ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.26, f'Q3: {round(q3_value, 3)}', transform=axes[i].transAxes, ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.30, f'Score: {round(asc_frame_result.score, 3)}', transform=axes[i].transAxes, ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.34, f'Coef.: {round(asc_frame_result.coeff[0][0], 3)} ',
                      transform=axes[i].transAxes,
                      ha='center', fontsize=16, fontweight='bold')
         mse = mean_squared_error(values, predictions)
-        axes[i].text(0.5, -0.18, f'Mean: {round(mean, 3):.3f}', transform=axes[i].transAxes, ha='center',
+        axes[i].text(0.5, -0.38, f'MSE: {round(mse, 7) * 1e3:.3f} x 1e-3', transform=axes[i].transAxes, ha='center',
                      fontsize=16, fontweight='bold')
-        axes[i].text(0.5, -0.22, f'Score: {round(asc_frame_result.score, 3)}', transform=axes[i].transAxes, ha='center',
-                     fontsize=16, fontweight='bold')
-        axes[i].text(0.5, -0.26, f'Coeff.: {round(asc_frame_result.coeff[0][0], 7) * 1e3:.3f} x 1e-3',
-                     transform=axes[i].transAxes,
-                     ha='center', fontsize=16, fontweight='bold')
-        mse = mean_squared_error(values, predictions)
-        axes[i].text(0.5, -0.30, f'MSE: {round(mse, 7) * 1e3:.3f} x 1e-3', transform=axes[i].transAxes, ha='center',
-                     fontsize=16, fontweight='bold')
-        axes[i].text(0.5, -0.34, f'Outliers: {num_outliers}', transform=axes[i].transAxes, ha='center',
+        axes[i].text(0.5, -0.42, f'Outliers: {num_outliers}', transform=axes[i].transAxes, ha='center',
                      fontsize=16, fontweight='bold')
         axes[i].set_ylabel('Values', fontsize=16)
         axes[i].set_title(f'Ascending Deviation {i + 1}\n', fontsize=16)
-    print(5*"#" + "_DESCENDING_" + 5*"#")
+
+    print(5 * "#" + "_DESCENDING_" + 5 * "#")
+
     for i, desc_frame_result in enumerate(result.descending_frame_results, start=len(result.ascending_frame_results)):
         values = desc_frame_result.frame['Value']
         predictions = desc_frame_result.frame['Prediction']
@@ -284,6 +293,8 @@ def plot_result_aio(title, result):
         min_val = boxplot_dict['whiskers'][0].get_ydata()[1]
         max_val = boxplot_dict['whiskers'][1].get_ydata()[1]
         mean = boxplot_dict['medians'][0].get_ydata()[0]
+        q1_value = boxplot_dict['boxes'][0].get_ydata()[1]
+        q3_value = boxplot_dict['boxes'][0].get_ydata()[2]
         outliers = [flier.get_ydata() for flier in boxplot_dict['fliers']]
         num_outliers = reduce(add, [len(outlier) for outlier in outliers])
         print(f"{i} asc Minimum: {min_val:.5f}")
@@ -297,21 +308,25 @@ def plot_result_aio(title, result):
         axes[i].tick_params(axis='y', labelsize=16)
         axes[i].text(0.5, -0.10, f'Min.: {round(min_val, 3)}', transform=axes[i].transAxes, ha='center',
                      fontsize=16, fontweight='bold')
-        axes[i].text(0.5, -0.14, f'Max.: {round(max_val, 3):.3f}',
+        axes[i].text(0.5, -0.14, f'Max.: {round(max_val, 3)}',
+                     transform=axes[i].transAxes,
+                     ha='center', fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.18, f'Q1: {round(q1_value, 3)}', transform=axes[i].transAxes, ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.22, f'Mean: {round(mean, 3)}', transform=axes[i].transAxes, ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.26, f'Q3: {round(q3_value, 3)}', transform=axes[i].transAxes, ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.30, f'Score: {round(desc_frame_result.score, 3)}', transform=axes[i].transAxes,
+                     ha='center',
+                     fontsize=16, fontweight='bold')
+        axes[i].text(0.5, -0.34, f'Coef.: {round(desc_frame_result.coeff[0][0], 3)}',
                      transform=axes[i].transAxes,
                      ha='center', fontsize=16, fontweight='bold')
         mse = mean_squared_error(values, predictions)
-        axes[i].text(0.5, -0.18, f'Mean: {round(mean, 3):.3f}', transform=axes[i].transAxes, ha='center',
+        axes[i].text(0.5, -0.38, f'MSE: {round(mse, 7) * 1e3:.3f} x 1e-3', transform=axes[i].transAxes, ha='center',
                      fontsize=16, fontweight='bold')
-        axes[i].text(0.5, -0.22, f'Score: {round(desc_frame_result.score, 3)}', transform=axes[i].transAxes, ha='center',
-                     fontsize=16, fontweight='bold')
-        axes[i].text(0.5, -0.26, f'Coeff.: {round(desc_frame_result.coeff[0][0], 7) * 1e3:.3f} x 1e-3',
-                     transform=axes[i].transAxes,
-                     ha='center', fontsize=16, fontweight='bold')
-        mse = mean_squared_error(values, predictions)
-        axes[i].text(0.5, -0.30, f'MSE: {round(mse, 7) * 1e3:.3f} x 1e-3', transform=axes[i].transAxes, ha='center',
-                     fontsize=16, fontweight='bold')
-        axes[i].text(0.5, -0.34, f'Outliers: {num_outliers}', transform=axes[i].transAxes, ha='center',
+        axes[i].text(0.5, -0.42, f'Outliers: {num_outliers}', transform=axes[i].transAxes, ha='center',
                      fontsize=16, fontweight='bold')
         axes[i].set_ylabel('Values', fontsize=16)
         axes[i].set_title(f'Descending Deviation {i + 1 - len(result.ascending_frame_results)}\n', fontsize=16)
@@ -376,40 +391,40 @@ def ransac(ascending_frames, descending_frames, debug):
     for i, asc_df in enumerate(ascending_frames):
         time_ns_asc = asc_df[['Time']]
         values_asc = asc_df[['Value']]
-        time_ms_asc = convert_to_ms(time_ns_asc)
+        time_s_asc = convert_to_s(time_ns_asc)
         ransac = lm.RANSACRegressor()
-        ransac.fit(time_ms_asc, values_asc)
-        asc_df['Prediction'] = ransac.predict(time_ms_asc)
+        ransac.fit(time_s_asc, values_asc)
+        asc_df['Prediction'] = ransac.predict(time_s_asc)
         ascending_frame_results.append(
-            PredictionResult("ransac", i, ransac.score(time_ms_asc, values_asc), ransac.estimator_.coef_, asc_df))
+            PredictionResult("ransac", i, ransac.score(time_s_asc, values_asc), ransac.estimator_.coef_, asc_df))
         if (debug):
-            print(f"Ransac asc Score: {ransac.score(time_ms_asc, values_asc)}")
+            print(f"Ransac asc Score: {ransac.score(time_s_asc, values_asc)}")
             print(f"Ransac asc coef: {ransac.estimator_.coef_}")
             # plt.scatter(time_ms_asc, values_asc, color='green', label='ascending values')
             inlier_mask = ransac.inlier_mask_
             outlier_mask = np.logical_not(inlier_mask)
-            plt.scatter(time_ms_asc[inlier_mask], values_asc[inlier_mask], c='steelblue', marker='o', label='Inliers')
-            plt.scatter(time_ms_asc[outlier_mask], values_asc[outlier_mask], c='limegreen', marker='s',
+            plt.scatter(time_s_asc[inlier_mask], values_asc[inlier_mask], c='steelblue', marker='o', label='Inliers')
+            plt.scatter(time_s_asc[outlier_mask], values_asc[outlier_mask], c='limegreen', marker='s',
                         label='Outliers')
     # descending values and time
     descending_frame_results = []
     for i, desc_df in enumerate(descending_frames):
         time_ns_desc = desc_df[['Time']]
         values_desc = desc_df[['Value']]
-        time_ms_desc = convert_to_ms(time_ns_desc)
+        time_s_desc = convert_to_s(time_ns_desc)
         ransac = lm.RANSACRegressor()
-        ransac.fit(time_ms_desc, values_desc)
-        desc_df['Prediction'] = ransac.predict(time_ms_desc)
+        ransac.fit(time_s_desc, values_desc)
+        desc_df['Prediction'] = ransac.predict(time_s_desc)
         descending_frame_results.append(
-            PredictionResult("ransac", i, ransac.score(time_ms_desc, values_desc), ransac.estimator_.coef_, desc_df))
+            PredictionResult("ransac", i, ransac.score(time_s_desc, values_desc), ransac.estimator_.coef_, desc_df))
         if (debug):
-            print(f"Ransac des Params: {ransac.score(time_ms_desc, values_desc)}")
+            print(f"Ransac des Params: {ransac.score(time_s_desc, values_desc)}")
             print(f"Ransac des coef: {ransac.estimator_.coef_}")
             # plt.scatter(time_ms_desc, values_desc, color='red', label='descending values')
             inlier_mask = ransac.inlier_mask_
             outlier_mask = np.logical_not(inlier_mask)
-            plt.scatter(time_ms_desc[inlier_mask], values_desc[inlier_mask], c='steelblue', marker='o', label='Inliers')
-            plt.scatter(time_ms_desc[outlier_mask], values_desc[outlier_mask], c='limegreen', marker='s',
+            plt.scatter(time_s_desc[inlier_mask], values_desc[inlier_mask], c='steelblue', marker='o', label='Inliers')
+            plt.scatter(time_s_desc[outlier_mask], values_desc[outlier_mask], c='limegreen', marker='s',
                         label='Outliers')
 
     return Results(ascending_frame_results, descending_frame_results)

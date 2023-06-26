@@ -14,7 +14,8 @@ def parse_cli_args():
     parser = argparse.ArgumentParser(description='plot collected data')
     parser.add_argument('file', type=str, help='Serial port which is opened.')
     parser.add_argument('--plot_type', '-t', type=str,
-                        choices=['asc_desc', 'asc_desc_base', 'base', 'cut', 'cut_base', 'dbscan', 'raw', 'raw_shifted'],
+                        choices=['asc_desc', 'asc_desc_base', 'base', 'cut', 'cut_base', 'dbscan', 'raw',
+                                 'raw_shifted'],
                         default='', help='How data is plotted.')
 
     return parser.parse_args(args=None if sys.argv[1:] else ["--help"])
@@ -50,6 +51,10 @@ def convert_to_ms(time):
     return time / 1e6
 
 
+def convert_to_s(time):
+    return time / 1e9
+
+
 def get_asc_desc_frames(df):
     # Initialize empty DataFrames for A and B
     ascending_df = pd.DataFrame(columns=['Time', 'Value'])
@@ -82,6 +87,7 @@ def get_asc_desc_frames(df):
 
     return ascending_frames, descending_frames
 
+
 def plot_dbscan(df):
     df = df.dropna(subset=['Value'])
     df_filtered = df[(df['Value'] >= min_threshold) & (df['Value'] <= max_threshold)]
@@ -110,6 +116,7 @@ def plot_dbscan(df):
     print("Estimated number of clusters: %d" % n_clusters_)
     print("Estimated number of noise points: %d" % n_noise_)
 
+
 def plot_raw(time, values, color):
     plt.plot(time, values, color=color, label='base')
 
@@ -124,9 +131,9 @@ def plot_base(time, values, color):
     # replace to near or to far with nan
     values[values > out_of_range] = float('NaN')
     # Convert time to milliseconds for better visualization
-    time_ms = convert_to_ms(time)
+    time_s = convert_to_s(time)
 
-    plt.plot(time_ms, values, color=color, label='base')
+    plt.plot(time_s, values, color=color, label='base')
 
 
 def plot_asc_desc(ascending_frames, descending_frames, asc_color, desc_color):
