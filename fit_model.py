@@ -45,6 +45,8 @@ def parse_cli_args():
                         help='If debug is set the ascending and descending data frames are shown.')
     parser.add_argument('--asc_desc', '-ad', action='store_true',
                         help='If this flag is set is set the ascending and descending data frames are shown.')
+    parser.add_argument('--table', '-t', action='store_true',
+                        help='If this flag is set the result is export as a csv table.')
 
     return parser.parse_args(args=None if sys.argv[1:] else ["--help"])
 
@@ -220,6 +222,36 @@ def plot_predicted_line(title, df_shifted_filterd, result, color, show_asc_desc_
     plt.xlabel('Time (s)', fontsize=24, fontweight='bold')
     plt.ylabel('Distance (mm)', fontsize=24, fontweight='bold')
     plt.subplots_adjust(left=0.06, right=0.99, bottom=0.075, top=0.96)
+
+
+def export_as_table(result):
+
+    for i, asc_frame_result in enumerate(result.ascending_frame_results):
+        values = asc_frame_result.frame['Value']
+        predictions = asc_frame_result.frame['Prediction']
+        print(f"max_error:{max_error(values, predictions)}")
+        print(f"mean_absolute_error:{mean_absolute_error(values, predictions)}")
+        print(f"mean_squared_error:{mean_squared_error(values, predictions)}")
+        deviations = values - predictions
+        std_dev = deviations.std()
+
+        asc_boxplot_dict = deviations.boxplot(widths=0.4)
+        #
+        #
+        # # ascending results
+        # asc_outliers = asc_boxplot_dict['fliers'][0].get_data()[1]
+        #
+        # asc_whiskers = [whiskers.get_data()[1] for whiskers in asc_boxplot_dict['whiskers']]
+        # asc_min = np.min(asc_whiskers)
+        # asc_max = np.max(asc_whiskers)
+        #
+        # asc_mean = asc_boxplot_dict['means'][0].get_data()[1]
+
+        # descending results
+
+
+
+    pass
 
 
 def plot_result_aio(title, result):
@@ -460,19 +492,23 @@ if __name__ == "__main__":
     df_shifted = shift_to_zero(df)
     df_shifted_filterd = filter_values_out_of_range(df_shifted)
     ascending_frames, descending_frames = get_asc_desc_frames(df_shifted_filterd, db_scan, debug_outlier)
-    if model == "linear":
-        result = linear_reg(ascending_frames, descending_frames)
-        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
-        plot_result(title, result)
-    elif model == "linear_ransac":
-        result = linear_reg(ascending_frames, descending_frames)
-        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
-        plot_result(title, result)
-        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
-        plot_result(title, result)
-    else:
+    # if model == "linear":
+    #     result = linear_reg(ascending_frames, descending_frames)
+    #     plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+    #     plot_result(title, result)
+    # elif model == "linear_ransac":
+    #     result = linear_reg(ascending_frames, descending_frames)
+    #     plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+    #     plot_result(title, result)
+    #     plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+    #     plot_result(title, result)
+    # else:
+    #     result = ransac(ascending_frames, descending_frames, debug)
+    #     plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+    #     plot_result(title, result)
+
+    if model == "ransac":
         result = ransac(ascending_frames, descending_frames, debug)
-        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
-        plot_result_aio(title, result)
+        export_as_table(result)
 
     plt.show()
