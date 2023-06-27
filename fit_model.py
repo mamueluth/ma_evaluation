@@ -13,6 +13,7 @@ from functools import reduce
 from operator import add
 from sklearn.metrics import max_error, mean_absolute_error, mean_squared_error
 from sklearn.cluster import DBSCAN
+from main import save_dict_to_csv
 
 out_of_range = 300
 max_threshold = 8.84
@@ -47,6 +48,8 @@ def parse_cli_args():
                         help='If this flag is set is set the ascending and descending data frames are shown.')
     parser.add_argument('--table', '-t', action='store_true',
                         help='If this flag is set the result is export as a csv table.')
+    parser.add_argument('--table_name', '-tn', default='table.csv',
+                        help='The file path to save the csv table in.')
 
     return parser.parse_args(args=None if sys.argv[1:] else ["--help"])
 
@@ -224,32 +227,71 @@ def plot_predicted_line(title, df_shifted_filterd, result, color, show_asc_desc_
     plt.subplots_adjust(left=0.06, right=0.99, bottom=0.075, top=0.96)
 
 
-def export_as_table(result):
+def export_as_table(result, save_table, file_name, output_csv):
+
+    file_basename = os.path.basename(file_name)
+    file_name_wo_ext = os.path.splitext(file_basename)[0]
+
+    keys = ['name', 'line', 'min_val', 'max_val', 'mean', 'std_dev', 'q1_value', 'q3_value', 'num_outliers', 'score', 'coef', 'mse']
+    asc_dict = {key: [] for key in keys}
+    asc_dict['name'] = file_name_wo_ext
+    asc_dict['line'] = 'asc'
 
     for i, asc_frame_result in enumerate(result.ascending_frame_results):
         values = asc_frame_result.frame['Value']
         predictions = asc_frame_result.frame['Prediction']
-        print(f"max_error:{max_error(values, predictions)}")
-        print(f"mean_absolute_error:{mean_absolute_error(values, predictions)}")
-        print(f"mean_squared_error:{mean_squared_error(values, predictions)}")
         deviations = values - predictions
-        std_dev = deviations.std()
 
-        asc_boxplot_dict = deviations.boxplot(widths=0.4)
-        #
-        #
-        # # ascending results
-        # asc_outliers = asc_boxplot_dict['fliers'][0].get_data()[1]
-        #
-        # asc_whiskers = [whiskers.get_data()[1] for whiskers in asc_boxplot_dict['whiskers']]
-        # asc_min = np.min(asc_whiskers)
-        # asc_max = np.max(asc_whiskers)
-        #
-        # asc_mean = asc_boxplot_dict['means'][0].get_data()[1]
+        asc_boxplot_dict = plt.boxplot(deviations, widths=0.4)
 
-        # descending results
+        asc_dict['min_val'].append(asc_boxplot_dict['whiskers'][0].get_ydata()[1])
+        asc_dict['max_val'].append(asc_boxplot_dict['whiskers'][1].get_ydata()[1])
+        asc_dict['mean'].append(asc_boxplot_dict['medians'][0].get_ydata()[0])
+        asc_dict['std_dev'].append(deviations.std())
+        asc_dict['q1_value'].append(asc_boxplot_dict['boxes'][0].get_ydata()[1])
+        asc_dict['q3_value'].append(asc_boxplot_dict['boxes'][0].get_ydata()[2])
+        outliers = [flier.get_ydata() for flier in asc_boxplot_dict['fliers']]
+        asc_dict['num_outliers'].append(reduce(add, [len(outlier) for outlier in outliers]))
+        asc_dict['score'].append(round(asc_frame_result.score, 3))
+        asc_dict['mse'].append(round(mean_squared_error(values, predictions), 7) * 1e3)
+        asc_dict['coef'].append(round(asc_frame_result.coeff[0][0], 3))
 
+    # calculate the mean of all ascending lines
+    for key, value in asc_dict.items():
+        if type(value) is not str:
+            asc_dict[key] = round(np.mean(value), 3)
 
+    desc_dict = {key: [] for key in keys}
+    desc_dict['name'] = file_name_wo_ext
+    desc_dict['line'] = 'desc'
+
+    for i, desc_frame_result in enumerate(result.descending_frame_results, start=len(result.ascending_frame_results)):
+        values = desc_frame_result.frame['Value']
+        predictions = desc_frame_result.frame['Prediction']
+        deviations = values - predictions
+
+        desc_boxplot_dict = plt.boxplot(deviations, widths=0.4)
+
+        desc_dict['min_val'].append(desc_boxplot_dict['whiskers'][0].get_ydata()[1])
+        desc_dict['max_val'].append(desc_boxplot_dict['whiskers'][1].get_ydata()[1])
+        desc_dict['mean'].append(desc_boxplot_dict['medians'][0].get_ydata()[0])
+        desc_dict['std_dev'].append(deviations.std())
+        desc_dict['q1_value'].append(desc_boxplot_dict['boxes'][0].get_ydata()[1])
+        desc_dict['q3_value'].append(desc_boxplot_dict['boxes'][0].get_ydata()[2])
+        outliers = [flier.get_ydata() for flier in desc_boxplot_dict['fliers']]
+        desc_dict['num_outliers'].append(reduce(add, [len(outlier) for outlier in outliers]))
+        desc_dict['score'].append(round(desc_frame_result.score, 3))
+        desc_dict['mse'].append(round(mean_squared_error(values, predictions), 7) * 1e3)
+        desc_dict['coef'].append(round(desc_frame_result.coeff[0][0], 3))
+
+    # calculate the mean of all descending lines
+    for key, value in desc_dict.items():
+        if type(value) is not str:
+            desc_dict[key] = round(np.mean(value), 3)
+
+    if save_table:
+        save_dict_to_csv(asc_dict, output_csv)
+        save_dict_to_csv(desc_dict, output_csv)
 
     pass
 
@@ -484,6 +526,8 @@ if __name__ == "__main__":
     debug = args.debug
     debug_outlier = args.debug_outlier
     show_asc_desc_frame = args.asc_desc
+    save_table = args.table
+    table_file_name = args.out_csv
 
     df = read_values(file_name)
     samples_per_second = calculate_samples_per_second(df)
@@ -509,6 +553,6 @@ if __name__ == "__main__":
 
     if model == "ransac":
         result = ransac(ascending_frames, descending_frames, debug)
-        export_as_table(result)
+        export_as_table(result, save_table=args.table, file_name=args.file, output_csv=args.output_csv)
 
     plt.show()
