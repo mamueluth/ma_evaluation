@@ -18,9 +18,6 @@ if __name__ =="__main__":
     df = pd.read_csv(input_file)
     # Transpose the DataFrame
     df_transposed = df.transpose()
-    latex_table = df_transposed.to_latex(index=True)
+    latex_table = df_transposed.to_latex(index=True, float_format="%.3f")
     with open(table_name, 'w') as f:
         f.write(latex_table)
-
-    # # Write the transposed DataFrame to a new CSV file
-    # df_transposed.to_csv(output_file, index=True, header=False)

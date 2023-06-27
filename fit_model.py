@@ -16,8 +16,8 @@ from sklearn.metrics import max_error, mean_absolute_error, mean_squared_error
 from sklearn.cluster import DBSCAN
 
 out_of_range = 300
-max_threshold = 8.84
-min_threshold = 6.36
+max_threshold = 9.5
+min_threshold = 6.94
 
 
 @dataclass
@@ -483,7 +483,7 @@ def plot_result(title, result):
 def ransac(ascending_frames, descending_frames, debug):
     # ascending values and time
     ascending_frame_results = []
-    for i, asc_df in enumerate(ascending_frames):
+    for i, asc_df in enumerate(ascending_frames[0:3]):
         time_ns_asc = asc_df[['Time']]
         values_asc = asc_df[['Value']]
         time_s_asc = convert_to_s(time_ns_asc)
@@ -503,7 +503,7 @@ def ransac(ascending_frames, descending_frames, debug):
                         label='Outliers')
     # descending values and time
     descending_frame_results = []
-    for i, desc_df in enumerate(descending_frames):
+    for i, desc_df in enumerate(descending_frames[0:3]):
         time_ns_desc = desc_df[['Time']]
         values_desc = desc_df[['Value']]
         time_s_desc = convert_to_s(time_ns_desc)
@@ -557,23 +557,26 @@ if __name__ == "__main__":
     df_shifted = shift_to_zero(df)
     df_shifted_filterd = filter_values_out_of_range(df_shifted)
     ascending_frames, descending_frames = get_asc_desc_frames(df_shifted_filterd, db_scan, debug_outlier)
-    # if model == "linear":
-    #     result = linear_reg(ascending_frames, descending_frames)
-    #     plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
-    #     plot_result(title, result)
-    # elif model == "linear_ransac":
-    #     result = linear_reg(ascending_frames, descending_frames)
-    #     plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
-    #     plot_result(title, result)
-    #     plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
-    #     plot_result(title, result)
-    # else:
-    #     result = ransac(ascending_frames, descending_frames, debug)
-    #     plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
-    #     plot_result(title, result)
-
-    if model == "ransac":
+    if model == "linear":
+        result = linear_reg(ascending_frames, descending_frames)
+        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+        plot_result(title, result)
+        if save_table:
+            export_as_table(result, file_name=file_name, output_csv=table_file_name)
+    elif model == "linear_ransac":
+        result = linear_reg(ascending_frames, descending_frames)
+        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+        plot_result(title, result)
+        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+        plot_result(title, result)
+        if save_table:
+            export_as_table(result, file_name=file_name, output_csv=table_file_name)
+    else:
         result = ransac(ascending_frames, descending_frames, debug)
-        export_as_table(result, file_name=file_name, output_csv=table_file_name)
+        plot_predicted_line(title, df_shifted_filterd, result, 'red', show_asc_desc_frame)
+        plot_result_aio(title, result)
+        if save_table:
+            export_as_table(result, file_name=file_name, output_csv=table_file_name)
+
 
     plt.show()
